@@ -1,26 +1,8 @@
-<script module lang="ts">
-  import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { getAlbumInfo } from '@immich/sdk';
-
-  // eslint-disable-next-line svelte/prefer-svelte-reactivity
-  const albumNameCache = new Map<string, Promise<string>>();
-
-  const getAlbumName = (id: string): Promise<string> => {
-    let albumName = albumNameCache.get(id);
-    if (!albumName) {
-      albumName = getAlbumInfo({ ...authManager.params, id })
-        .then((album) => album.albumName)
-        .catch(() => id);
-      albumNameCache.set(id, albumName);
-    }
-    return albumName;
-  };
-</script>
-
 <script lang="ts">
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { pluginManager } from '$lib/managers/plugin-manager.svelte';
   import type { JSONSchemaProperty } from '$lib/types';
-  import type { WorkflowStepDto } from '@immich/sdk';
+  import { getAlbumInfo, type WorkflowStepDto } from '@immich/sdk';
   import { Badge, Card, CardBody, CardDescription, CardHeader, CardTitle, Icon, IconButton } from '@immich/ui';
   import {
     mdiAutoFix,
@@ -37,13 +19,16 @@
   type Props = {
     step: WorkflowStepDto;
     index: number;
+    ghost: boolean;
     onEdit: (index: number) => void;
     onDelete: (index: number) => void;
     onInsertBefore: (index: number) => void;
     onDrop: (index: number, event: DragEvent) => void;
+    onDragOver: (index: number, event: DragEvent) => void;
+    onDragEnd: (index: number, event: DragEvent) => void;
   };
 
-  let { step, index, onEdit, onDelete, onInsertBefore, onDrop }: Props = $props();
+  let { step, index, ghost, onEdit, onDelete, onInsertBefore, onDrop, onDragOver, onDragEnd }: Props = $props();
 
   const method = $derived(pluginManager.getMethod(step.method));
   const isFilter = $derived(method?.uiHints?.includes('Filter') ?? false);
@@ -57,6 +42,19 @@
   let dragImage = $state<Element>();
   let isDropTarget = $state(false);
   let hoverDrag = $state(false);
+
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const albumNameCache = new Map<string, Promise<string>>();
+  const getAlbumName = (id: string): Promise<string> => {
+    let albumName = albumNameCache.get(id);
+    if (!albumName) {
+      albumName = getAlbumInfo({ ...authManager.params, id })
+        .then((album) => album.albumName)
+        .catch(() => id);
+      albumNameCache.set(id, albumName);
+    }
+    return albumName;
+  };
 
   const truncate = (input: string, max = 24) => (input.length > max ? input.slice(0, max - 1) + '…' : input);
 
@@ -115,23 +113,20 @@
     }
     event.preventDefault();
 
-    const from = Number(event.dataTransfer.getData('text/plain'));
-    if (from === index) {
-      return;
-    }
-
     onDrop(index, event);
   };
 
   const handleDragOver = (event: DragEvent) => {
     event.preventDefault();
     isDropTarget = true;
+    onDragOver(index, event);
   };
 
-  const handleDragEnd = () => {
+  const handleDragEnd = (event: DragEvent) => {
     dragImage?.remove();
     dragImage = undefined;
     isDropTarget = false;
+    onDragEnd(index, event);
   };
 </script>
 
